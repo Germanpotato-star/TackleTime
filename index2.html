@@ -12,7 +12,8 @@ h1{text-align:center;font-size:32px;margin-bottom:20px;}
 .mode-title{text-align:center;font-size:24px;margin-bottom:20px;}
 .time-display{text-align:center;font-size:50px;font-weight:bold;margin:20px 0;}
 input, select{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;margin-bottom:12px;}
-.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;}
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;} /* wider space between buttons */
+.alarm-row{margin-bottom:12px;} /* a little space between the two alarm rows */
 button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size:16px;background:white;color:#4A90E2;font-weight:bold;}
 .status{text-align:center;margin-top:10px;font-size:14px;opacity:0.95}
 .hidden{display:none;}
@@ -21,7 +22,6 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
 .world-clock h2{text-align:center;margin-bottom:15px;}
 .clock-box{background:rgba(255,255,255,0.12);border-radius:10px;padding:10px;margin-bottom:10px;}
 .clock-time{margin-top:5px;text-align:center;font-size:18px;}
-.small{font-size:12px;opacity:0.9;text-align:center;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -32,16 +32,19 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
   <div id="alarmPage">
     <div class="mode-title">Alarm</div>
     <input type="time" id="alarmTime">
-    <div class="controls">
+
+    <!-- Row 1: Set / Clear -->
+    <div class="controls alarm-row">
       <button onclick="setAlarm()">Set Alarm</button>
       <button onclick="clearAlarm()">Clear</button>
     </div>
-    <div class="controls">
+
+    <!-- Row 2: Test / Stop (a little space above from Row 1) -->
+    <div class="controls alarm-row">
       <button onclick="testSound()">Test Sound</button>
       <button onclick="stopSound()">Stop Sound</button>
     </div>
-    <div class="small">Optional: Choose your own sound</div>
-    <input type="file" id="soundFile" accept="audio/*">
+
     <div class="status" id="alarmStatus">No alarm set</div>
     <div class="status" id="soundStatus">Sound: alarm1.wav (default)</div>
   </div>
@@ -148,7 +151,7 @@ function playSound(loop=true){
     const p = soundEl.play();
     if (p && typeof p.then === "function") {
       return p.catch(err=>{
-        alert("Audio was blocked. Please press Test Sound first or check sound file.");
+        alert("Audio was blocked. Please press Test Sound first.");
         console.error(err);
       });
     }
@@ -168,20 +171,10 @@ function testSound(){
   }).then(()=> {
     document.getElementById("alarmStatus").textContent = "Test playing...";
   }).catch(err=>{
-    alert("Cannot play the sound. Check the file path or choose a file.");
+    alert("Cannot play the sound. Check alarm1.wav location.");
     console.error(err);
   });
 }
-
-// Allow custom sound file
-document.getElementById("soundFile").addEventListener("change", (e)=>{
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  soundEl.src = url;
-  soundEl.load();
-  soundStatus.textContent = "Sound: " + (file.name || "custom");
-});
 
 /* ---------------- ALARM ---------------- */
 let alarmTime = null;
@@ -315,7 +308,7 @@ setInterval(updateWorldClocks,1000);
 updateWorldClocks();
 updateStopwatch();
 
-// Also unlock audio on any first click/touch
+// Unlock audio on first click/touch
 window.addEventListener("click", ensureAudioUnlocked, { once:true });
 window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
 </script>
