@@ -131,9 +131,19 @@ function changeMode(){
 const soundEl = document.getElementById("alarmSound");
 let userInteracted = false;
 
+// Unlock audio on first user tap/click
 function ensureAudioUnlocked(){
   if (userInteracted) return Promise.resolve();
   userInteracted = true;
+
+  // Try to play/pause quickly to satisfy policies
+  try{
+    const p = soundEl.play();
+    if (p && typeof p.then === "function") {
+      return p.then(()=>{ soundEl.pause(); soundEl.currentTime = 0; }).catch(()=>{});
+    }
+  }catch(e){}
+  // Fallback: resume AudioContext
   if (window.AudioContext || window.webkitAudioContext) {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === "suspended") {
@@ -143,44 +153,51 @@ function ensureAudioUnlocked(){
   return Promise.resolve();
 }
 
-function playOnceFor5s(){
-  // play immediately, no alert, stop after 5s
+window.addEventListener("click", ensureAudioUnlocked, { once:true });
+window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
+
+function playLoopFor5s(){
   ensureAudioUnlocked().then(()=>{
-    soundEl.loop = true; // loop while the 5s window runs
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") {
-      p.catch(err=>{
-        console.error(err);
-      });
+    try{
+      soundEl.currentTime = 0;
+      soundEl.loop = true;
+      const p = soundEl.play();
+      if (p && typeof p.then === "function") {
+        p.catch(err=>console.error("Play error:", err));
+      }
+      setTimeout(stopSound, 5000);
+    }catch(err){
+      console.error("Play error:", err);
     }
-    setTimeout(stopSound, 5000);
   });
 }
 
 function playSound(loop=true){
-  soundEl.loop = loop;
-  return ensureAudioUnlocked().then(()=>{
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") {
-      return p.catch(err=>{
-        console.error(err);
-      });
+  ensureAudioUnlocked().then(()=>{
+    try{
+      soundEl.loop = loop;
+      const p = soundEl.play();
+      if (p && typeof p.then === "function") {
+        p.catch(err=>console.error("Play error:", err));
+      }
+    }catch(err){
+      console.error("Play error:", err);
     }
   });
 }
 
 function stopSound(){
-  soundEl.pause();
-  soundEl.currentTime = 0;
+  try{
+    soundEl.pause();
+    soundEl.currentTime = 0;
+    soundEl.loop = false;
+  }catch(e){}
 }
 
 function testSound(){
   ensureAudioUnlocked().then(()=>{
     stopSound();
-    soundEl.loop = false;
-    return soundEl.play();
-  }).catch(err=>{
-    console.error(err);
+    playSound(false);
   });
 }
 
@@ -208,7 +225,7 @@ setInterval(function(){
   const current = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
   if(current === alarmTime){
     alarmTriggered = true;
-    // Alarm: play and show alert as before (kept alert for alarm only)
+    // Alarm keeps old behavior: play and alert
     playSound(true);
     alert("It's time!");
   }
@@ -232,13 +249,12 @@ function startTimer(){
   timerInterval = setInterval(function(){
     timerSeconds--;
     if (timerSeconds <= 0) {
-      // Stop counting at zero
       timerSeconds = 0;
       updateTimerDisplay();
       clearInterval(timerInterval);
       timerInterval = null;
-      // No alert, start sound now and stop after 5s
-      playOnceFor5s();
+      // Play immediately, no alert, stop after 5s
+      playLoopFor5s();
       return;
     }
     updateTimerDisplay();
@@ -317,10 +333,6 @@ function updateWorldClocks(){
 setInterval(updateWorldClocks,1000);
 updateWorldClocks();
 updateStopwatch();
-
-// Unlock audio on first click/touch (helps mobile)
-window.addEventListener("click", ensureAudioUnlocked, { once:true });
-window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
 </script>
 </body>
 </html>
