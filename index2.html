@@ -131,7 +131,7 @@ function changeMode(){
 const soundEl = document.getElementById("alarmSound");
 let userInteracted = false;
 
-// Unlock audio on first user tap/click
+// Unlock audio on first user tap/click (needed on mobile)
 function ensureAudioUnlocked(){
   if (userInteracted) return Promise.resolve();
   userInteracted = true;
@@ -225,7 +225,7 @@ setInterval(function(){
   const current = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
   if(current === alarmTime){
     alarmTriggered = true;
-    // Alarm: play and alert
+    // Alarm: play continuously and alert
     playSound(true);
     alert("It's time!");
   }
