@@ -12,8 +12,8 @@ h1{text-align:center;font-size:32px;margin-bottom:20px;}
 .mode-title{text-align:center;font-size:24px;margin-bottom:20px;}
 .time-display{text-align:center;font-size:50px;font-weight:bold;margin:20px 0;}
 input, select{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;margin-bottom:12px;}
-.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;}
-.alarm-row{margin-bottom:12px;} /* small space between alarm rows */
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;} /* wider space between buttons */
+.alarm-row{margin-bottom:12px;} /* a little space between the two alarm rows */
 button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size:16px;background:white;color:#4A90E2;font-weight:bold;}
 .status{text-align:center;margin-top:10px;font-size:14px;opacity:0.95}
 .hidden{display:none;}
@@ -39,13 +39,14 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
       <button onclick="clearAlarm()">Clear</button>
     </div>
 
-    <!-- Row 2: Test / Stop -->
+    <!-- Row 2: Test / Stop (a little space above from Row 1) -->
     <div class="controls alarm-row">
       <button onclick="testSound()">Test Sound</button>
       <button onclick="stopSound()">Stop Sound</button>
     </div>
 
     <div class="status" id="alarmStatus">No alarm set</div>
+    <div class="status" id="soundStatus">Sound: alarm1.wav (default)</div>
   </div>
 
   <!-- TIMER -->
@@ -111,7 +112,7 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
 
 <button class="mode-button" onclick="changeMode()">⇄</button>
 
-<audio id="alarmSound" src="alarm.1wav" preload="auto"></audio>
+<audio id="alarmSound" src="alarm1.wav" preload="auto"></audio>
 
 <script>
 let currentMode = 0;
@@ -129,21 +130,12 @@ function changeMode(){
 
 /* ---------- Audio helpers ---------- */
 const soundEl = document.getElementById("alarmSound");
+const soundStatus = document.getElementById("soundStatus");
 let userInteracted = false;
 
-// Unlock audio on first user tap/click (needed on mobile)
 function ensureAudioUnlocked(){
   if (userInteracted) return Promise.resolve();
   userInteracted = true;
-
-  // Try quick play/pause to satisfy autoplay rules
-  try{
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") {
-      return p.then(()=>{ soundEl.pause(); soundEl.currentTime = 0; }).catch(()=>{});
-    }
-  }catch(e){}
-  // Fallback: resume AudioContext
   if (window.AudioContext || window.webkitAudioContext) {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === "suspended") {
@@ -153,51 +145,34 @@ function ensureAudioUnlocked(){
   return Promise.resolve();
 }
 
-window.addEventListener("click", ensureAudioUnlocked, { once:true });
-window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
-
-function playLoopFor5s(){
-  ensureAudioUnlocked().then(()=>{
-    try{
-      soundEl.currentTime = 0;
-      soundEl.loop = true;
-      const p = soundEl.play();
-      if (p && typeof p.then === "function") {
-        p.catch(err=>console.error("Play error:", err));
-      }
-      setTimeout(stopSound, 5000);
-    }catch(err){
-      console.error("Play error:", err);
-    }
-  });
-}
-
 function playSound(loop=true){
-  ensureAudioUnlocked().then(()=>{
-    try{
-      soundEl.loop = loop;
-      const p = soundEl.play();
-      if (p && typeof p.then === "function") {
-        p.catch(err=>console.error("Play error:", err));
-      }
-    }catch(err){
-      console.error("Play error:", err);
+  soundEl.loop = loop;
+  return ensureAudioUnlocked().then(()=>{
+    const p = soundEl.play();
+    if (p && typeof p.then === "function") {
+      return p.catch(err=>{
+        alert("Audio was blocked. Please press Test Sound first.");
+        console.error(err);
+      });
     }
   });
 }
 
 function stopSound(){
-  try{
-    soundEl.pause();
-    soundEl.currentTime = 0;
-    soundEl.loop = false;
-  }catch(e){}
+  soundEl.pause();
+  soundEl.currentTime = 0;
 }
 
 function testSound(){
   ensureAudioUnlocked().then(()=>{
     stopSound();
-    playSound(false);
+    soundEl.loop = false;
+    return soundEl.play();
+  }).then(()=> {
+    document.getElementById("alarmStatus").textContent = "Test playing...";
+  }).catch(err=>{
+    alert("Cannot play the sound. Check alarm1.wav location.");
+    console.error(err);
   });
 }
 
@@ -208,8 +183,11 @@ let alarmTriggered = false;
 function setAlarm(){
   alarmTime = document.getElementById("alarmTime").value;
   alarmTriggered = false;
-  document.getElementById("alarmStatus").textContent =
-    alarmTime ? ("Alarm set for " + alarmTime) : "Please choose a time.";
+  if (alarmTime){
+    document.getElementById("alarmStatus").textContent = "Alarm set for " + alarmTime;
+  } else {
+    document.getElementById("alarmStatus").textContent = "Please choose a time.";
+  }
 }
 
 function clearAlarm(){
@@ -225,7 +203,6 @@ setInterval(function(){
   const current = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
   if(current === alarmTime){
     alarmTriggered = true;
-    // Alarm: play continuously and alert
     playSound(true);
     alert("It's time!");
   }
@@ -248,16 +225,13 @@ function startTimer(){
   updateTimerDisplay();
   timerInterval = setInterval(function(){
     timerSeconds--;
-    if (timerSeconds <= 0) {
-      timerSeconds = 0;
-      updateTimerDisplay();
+    updateTimerDisplay();
+    if(timerSeconds <= 0){
       clearInterval(timerInterval);
       timerInterval = null;
-      // Play immediately, no alert, stop after 5s
-      playLoopFor5s();
-      return;
+      playSound(true);
+      alert("Timer finished!");
     }
-    updateTimerDisplay();
   },1000);
 }
 
@@ -333,6 +307,10 @@ function updateWorldClocks(){
 setInterval(updateWorldClocks,1000);
 updateWorldClocks();
 updateStopwatch();
+
+// Unlock audio on first click/touch
+window.addEventListener("click", ensureAudioUnlocked, { once:true });
+window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
 </script>
 </body>
 </html>
