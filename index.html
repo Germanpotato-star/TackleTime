@@ -12,8 +12,7 @@ h1{text-align:center;font-size:32px;margin-bottom:20px;}
 .mode-title{text-align:center;font-size:24px;margin-bottom:20px;}
 .time-display{text-align:center;font-size:50px;font-weight:bold;margin:20px 0;}
 input, select{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;margin-bottom:12px;}
-.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;}
-.alarm-row{margin-bottom:12px;} /* small space between alarm rows */
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;}
 button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size:16px;background:white;color:#4A90E2;font-weight:bold;}
 .status{text-align:center;margin-top:10px;font-size:14px;opacity:0.95}
 .hidden{display:none;}
@@ -22,6 +21,7 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
 .world-clock h2{text-align:center;margin-bottom:15px;}
 .clock-box{background:rgba(255,255,255,0.12);border-radius:10px;padding:10px;margin-bottom:10px;}
 .clock-time{margin-top:5px;text-align:center;font-size:18px;}
+.small{font-size:12px;opacity:0.9;text-align:center;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -32,20 +32,18 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
   <div id="alarmPage">
     <div class="mode-title">Alarm</div>
     <input type="time" id="alarmTime">
-
-    <!-- Row 1: Set / Clear -->
-    <div class="controls alarm-row">
+    <div class="controls">
       <button onclick="setAlarm()">Set Alarm</button>
       <button onclick="clearAlarm()">Clear</button>
     </div>
-
-    <!-- Row 2: Test / Stop -->
-    <div class="controls alarm-row">
+    <div class="controls">
       <button onclick="testSound()">Test Sound</button>
       <button onclick="stopSound()">Stop Sound</button>
     </div>
-
+    <div class="small">Optional: Choose your own sound</div>
+    <input type="file" id="soundFile" accept="audio/*">
     <div class="status" id="alarmStatus">No alarm set</div>
+    <div class="status" id="soundStatus">Sound: alarm1.wav (default)</div>
   </div>
 
   <!-- TIMER -->
@@ -129,6 +127,7 @@ function changeMode(){
 
 /* ---------- Audio helpers ---------- */
 const soundEl = document.getElementById("alarmSound");
+const soundStatus = document.getElementById("soundStatus");
 let userInteracted = false;
 
 function ensureAudioUnlocked(){
@@ -143,26 +142,13 @@ function ensureAudioUnlocked(){
   return Promise.resolve();
 }
 
-function playOnceFor5s(){
-  // play immediately, no alert, stop after 5s
-  ensureAudioUnlocked().then(()=>{
-    soundEl.loop = true; // loop while the 5s window runs
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") {
-      p.catch(err=>{
-        console.error(err);
-      });
-    }
-    setTimeout(stopSound, 5000);
-  });
-}
-
 function playSound(loop=true){
   soundEl.loop = loop;
   return ensureAudioUnlocked().then(()=>{
     const p = soundEl.play();
     if (p && typeof p.then === "function") {
       return p.catch(err=>{
+        alert("Audio was blocked. Please press Test Sound first or check sound file.");
         console.error(err);
       });
     }
@@ -179,10 +165,23 @@ function testSound(){
     stopSound();
     soundEl.loop = false;
     return soundEl.play();
+  }).then(()=> {
+    document.getElementById("alarmStatus").textContent = "Test playing...";
   }).catch(err=>{
+    alert("Cannot play the sound. Check the file path or choose a file.");
     console.error(err);
   });
 }
+
+// Allow custom sound file
+document.getElementById("soundFile").addEventListener("change", (e)=>{
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  soundEl.src = url;
+  soundEl.load();
+  soundStatus.textContent = "Sound: " + (file.name || "custom");
+});
 
 /* ---------------- ALARM ---------------- */
 let alarmTime = null;
@@ -191,8 +190,11 @@ let alarmTriggered = false;
 function setAlarm(){
   alarmTime = document.getElementById("alarmTime").value;
   alarmTriggered = false;
-  document.getElementById("alarmStatus").textContent =
-    alarmTime ? ("Alarm set for " + alarmTime) : "Please choose a time.";
+  if (alarmTime){
+    document.getElementById("alarmStatus").textContent = "Alarm set for " + alarmTime;
+  } else {
+    document.getElementById("alarmStatus").textContent = "Please choose a time.";
+  }
 }
 
 function clearAlarm(){
@@ -208,7 +210,6 @@ setInterval(function(){
   const current = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
   if(current === alarmTime){
     alarmTriggered = true;
-    // Alarm: play and show alert as before (kept alert for alarm only)
     playSound(true);
     alert("It's time!");
   }
@@ -231,17 +232,13 @@ function startTimer(){
   updateTimerDisplay();
   timerInterval = setInterval(function(){
     timerSeconds--;
-    if (timerSeconds <= 0) {
-      // Stop counting at zero
-      timerSeconds = 0;
-      updateTimerDisplay();
+    updateTimerDisplay();
+    if(timerSeconds <= 0){
       clearInterval(timerInterval);
       timerInterval = null;
-      // No alert, start sound now and stop after 5s
-      playOnceFor5s();
-      return;
+      playSound(true);
+      alert("Timer finished!");
     }
-    updateTimerDisplay();
   },1000);
 }
 
@@ -318,7 +315,7 @@ setInterval(updateWorldClocks,1000);
 updateWorldClocks();
 updateStopwatch();
 
-// Unlock audio on first click/touch (helps mobile)
+// Also unlock audio on any first click/touch
 window.addEventListener("click", ensureAudioUnlocked, { once:true });
 window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
 </script>
