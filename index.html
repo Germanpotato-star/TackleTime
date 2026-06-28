@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Tackle Time</title>
 <style>
+/* Basic layout */
 *{margin:0;padding:0;box-sizing:border-box;font-family:Arial, sans-serif;}
 body{background:#4A90E2;color:white;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;}
 .container{width:100%;max-width:520px;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:14px;padding:20px;}
@@ -16,11 +17,26 @@ input, select{width:100%;padding:10px;border:none;border-radius:8px;font-size:16
 .alarm-row{margin-bottom:10px;}
 button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:15px;background:white;color:#4A90E2;font-weight:bold;}
 .status{text-align:center;margin-top:8px;font-size:13px;opacity:0.95}
-.mode-button{position:fixed;right:16px;bottom:16px;width:60px;height:60px;border-radius:50%;border:none;background:white;color:#4A90E2;font-size:22px;font-weight:bold;cursor:pointer;}
 .world-clock{margin-top:18px;}
 .clock-box{background:rgba(255,255,255,0.12);border-radius:10px;padding:10px;margin-bottom:10px;}
 .clock-time{text-align:center;font-size:16px;margin-top:6px;}
 .enable-row{text-align:center;margin:10px 0;}
+
+/* Page visibility */
+.page{display:none;}
+.page.active{display:block;}
+
+/* Bottom-right page buttons */
+.page-buttons{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;}
+.page-button{width:52px;height:44px;border-radius:8px;background:white;color:#4A90E2;font-weight:bold;border:none;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
+.page-button span{display:block;font-size:12px;}
+
+/* Small responsive tweak */
+@media (max-width:480px){
+  .container{padding:14px;}
+  .time-display{font-size:36px;}
+  .page-button{width:48px;height:40px;}
+}
 </style>
 </head>
 <body>
@@ -32,8 +48,8 @@ button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:
     <div class="status" id="enableStatus">Click this once to allow alarms/timer sounds.</div>
   </div>
 
-  <!-- ALARM -->
-  <div id="alarmPage">
+  <!-- Alarm Page -->
+  <div id="alarmPage" class="page active">
     <div class="mode-title">Alarm</div>
     <input type="time" id="alarmTime">
     <div class="controls alarm-row">
@@ -47,8 +63,8 @@ button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:
     <div class="status" id="alarmStatus">No alarm set</div>
   </div>
 
-  <!-- TIMER -->
-  <div id="timerPage" class="hidden">
+  <!-- Timer Page -->
+  <div id="timerPage" class="page">
     <div class="mode-title">Timer</div>
     <input type="number" id="timerMinutes" min="1" placeholder="Enter minutes">
     <div class="time-display" id="timerDisplay">00:00</div>
@@ -59,8 +75,8 @@ button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:
     </div>
   </div>
 
-  <!-- STOPWATCH -->
-  <div id="stopwatchPage" class="hidden">
+  <!-- Stopwatch Page -->
+  <div id="stopwatchPage" class="page">
     <div class="mode-title">Stopwatch</div>
     <div class="time-display" id="stopwatchDisplay">00:00:00</div>
     <div class="controls">
@@ -70,9 +86,9 @@ button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:
     </div>
   </div>
 
-  <!-- WORLD CLOCK -->
-  <div class="world-clock">
-    <h2 style="text-align:center;margin-bottom:8px;">World Clock</h2>
+  <!-- World Clock Page -->
+  <div id="worldPage" class="page">
+    <div class="mode-title">World Clock</div>
     <div class="clock-box">
       <select id="country1">
         <option value="">Choose Country 1</option>
@@ -108,26 +124,26 @@ button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:
   </div>
 </div>
 
-<button class="mode-button" onclick="changeMode()">⇄</button>
+<!-- Bottom-right page buttons -->
+<div class="page-buttons" aria-hidden="false">
+  <button class="page-button" onclick="showPage('alarmPage')"><span>ALM</span></button>
+  <button class="page-button" onclick="showPage('timerPage')"><span>TMR</span></button>
+  <button class="page-button" onclick="showPage('stopwatchPage')"><span>STP</span></button>
+  <button class="page-button" onclick="showPage('worldPage')"><span>CLK</span></button>
+</div>
 
-<!-- Place alarm1.wav next to this HTML file -->
+<!-- Audio file -->
 <audio id="alarmSound" src="alarm1.wav" preload="auto"></audio>
 
 <script>
-/* UI pages */
-let currentMode = 0;
-const pages = [
-  document.getElementById('alarmPage'),
-  document.getElementById('timerPage'),
-  document.getElementById('stopwatchPage')
-];
-function changeMode(){
-  pages[currentMode].classList.add('hidden');
-  currentMode = (currentMode + 1) % pages.length;
-  pages[currentMode].classList.remove('hidden');
+/* Page navigation */
+function showPage(id){
+  const pages = document.querySelectorAll('.page');
+  pages.forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
-/* Audio element and unlocking */
+/* Audio unlocking and helpers (keep previous behavior) */
 const soundEl = document.getElementById('alarmSound');
 const enableBtn = document.getElementById('enableSoundBtn');
 const enableStatus = document.getElementById('enableStatus');
@@ -154,11 +170,9 @@ function ensureAudioUnlocked(){
 
 enableBtn.addEventListener('click', () => { ensureAudioUnlocked(); });
 
-/* Sound helpers */
 function startPlaying(loop=true, autoStopMs=0){
   return ensureAudioUnlocked().then(()=>{
     try{
-      // clear previous auto-stop if any
       if (autoStopTimeoutId) { clearTimeout(autoStopTimeoutId); autoStopTimeoutId = null; }
       soundEl.loop = loop;
       soundEl.currentTime = 0;
@@ -176,8 +190,8 @@ function startPlaying(loop=true, autoStopMs=0){
   });
 }
 
-function playSound(loop=true){ return startPlaying(loop, 0); } // continuous until stop
-function playSoundFor5s(){ return startPlaying(true, 5000); } // loop and stop after 5s
+function playSound(loop=true){ return startPlaying(loop, 0); }
+function playSoundFor5s(){ return startPlaying(true, 5000); }
 
 function stopSound(){
   try{
@@ -207,14 +221,13 @@ function clearAlarm(){
   stopSound();
 }
 
-/* Alarm: now auto-stops after 5s */
-setInterval(() => {
-  if (!alarmTime || alarmTriggered) return;
+setInterval(function(){
+  if(!alarmTime || alarmTriggered) return;
   const now = new Date();
   const current = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  if (current === alarmTime){
+  if(current === alarmTime){
     alarmTriggered = true;
-    // Play for 5 seconds then stop
+    // Play for 5 seconds automatically
     playSoundFor5s();
   }
 }, 1000);
@@ -245,7 +258,6 @@ function startTimer(){
       updateTimerDisplay();
       clearInterval(timerInterval);
       timerInterval = null;
-      // Play sound for 5 seconds
       playSoundFor5s();
       return;
     }
