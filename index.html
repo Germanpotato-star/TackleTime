@@ -1,33 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Tackle Time</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Arial, sans-serif;}
 body{background:#4A90E2;color:white;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;}
-.container{width:100%;max-width:450px;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:20px;padding:25px;}
-h1{text-align:center;font-size:32px;margin-bottom:20px;}
-.mode-title{text-align:center;font-size:24px;margin-bottom:20px;}
-.time-display{text-align:center;font-size:50px;font-weight:bold;margin:20px 0;}
-input, select{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;margin-bottom:12px;}
-.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;}
-.alarm-row{margin-bottom:12px;}
-button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size:16px;background:white;color:#4A90E2;font-weight:bold;}
-.status{text-align:center;margin-top:10px;font-size:14px;opacity:0.95}
-.hidden{display:none;}
-.mode-button{position:fixed;right:20px;bottom:20px;width:70px;height:70px;border-radius:50%;border:none;background:white;color:#4A90E2;font-size:28px;font-weight:bold;cursor:pointer;}
-.world-clock{margin-top:30px;}
-.world-clock h2{text-align:center;margin-bottom:15px;}
+.container{width:100%;max-width:520px;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:14px;padding:20px;}
+h1{text-align:center;font-size:28px;margin-bottom:12px;}
+.mode-title{text-align:center;font-size:20px;margin-bottom:10px;}
+.time-display{text-align:center;font-size:44px;font-weight:bold;margin:14px 0;}
+input, select{width:100%;padding:10px;border:none;border-radius:8px;font-size:16px;margin-bottom:10px;}
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:8px;}
+.alarm-row{margin-bottom:10px;}
+button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:15px;background:white;color:#4A90E2;font-weight:bold;}
+.status{text-align:center;margin-top:8px;font-size:13px;opacity:0.95}
+.mode-button{position:fixed;right:16px;bottom:16px;width:60px;height:60px;border-radius:50%;border:none;background:white;color:#4A90E2;font-size:22px;font-weight:bold;cursor:pointer;}
+.world-clock{margin-top:18px;}
 .clock-box{background:rgba(255,255,255,0.12);border-radius:10px;padding:10px;margin-bottom:10px;}
-.clock-time{margin-top:5px;text-align:center;font-size:18px;}
-.small{font-size:12px;opacity:0.9;text-align:center;margin-top:6px;}
+.clock-time{text-align:center;font-size:16px;margin-top:6px;}
+.enable-row{text-align:center;margin:10px 0;}
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Tackle Time</h1>
+
+  <div class="enable-row">
+    <button id="enableSoundBtn">Enable Sound (Click once)</button>
+    <div class="status" id="enableStatus">Click this once to allow alarms/timer sounds.</div>
+  </div>
 
   <!-- ALARM -->
   <div id="alarmPage">
@@ -69,7 +72,7 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
 
   <!-- WORLD CLOCK -->
   <div class="world-clock">
-    <h2>World Clock</h2>
+    <h2 style="text-align:center;margin-bottom:8px;">World Clock</h2>
     <div class="clock-box">
       <select id="country1">
         <option value="">Choose Country 1</option>
@@ -107,152 +110,147 @@ button{border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-size
 
 <button class="mode-button" onclick="changeMode()">⇄</button>
 
-<!-- Use the exact file name. Place alarm1.wav next to this HTML file. -->
+<!-- Use alarm1.wav (place this file next to this HTML) -->
 <audio id="alarmSound" src="alarm1.wav" preload="auto"></audio>
 
 <script>
+/* UI pages */
 let currentMode = 0;
 const pages = [
-  document.getElementById("alarmPage"),
-  document.getElementById("timerPage"),
-  document.getElementById("stopwatchPage")
+  document.getElementById('alarmPage'),
+  document.getElementById('timerPage'),
+  document.getElementById('stopwatchPage')
 ];
-
 function changeMode(){
-  pages[currentMode].classList.add("hidden");
+  pages[currentMode].classList.add('hidden');
   currentMode = (currentMode + 1) % pages.length;
-  pages[currentMode].classList.remove("hidden");
+  pages[currentMode].classList.remove('hidden');
 }
 
-/* ---------- Audio helpers ---------- */
-const soundEl = document.getElementById("alarmSound");
-let userInteracted = false;
+/* Audio element and unlocking */
+const soundEl = document.getElementById('alarmSound');
+const enableBtn = document.getElementById('enableSoundBtn');
+const enableStatus = document.getElementById('enableStatus');
+let audioUnlocked = false;
 
-// Robust unlock: quick play/pause and AudioContext resume
 function ensureAudioUnlocked(){
-  if (userInteracted) return Promise.resolve();
-  userInteracted = true;
+  if (audioUnlocked) return Promise.resolve();
+  // try quick play/pause
   return new Promise((resolve) => {
     try {
       soundEl.currentTime = 0;
       const p = soundEl.play();
-      if (p && typeof p.then === "function") {
-        p.then(()=>{ soundEl.pause(); soundEl.currentTime = 0; resolve(); })
-         .catch(()=>{
-           if (window.AudioContext || window.webkitAudioContext) {
-             const ctx = new (window.AudioContext || window.webkitAudioContext)();
-             if (ctx.state === "suspended") {
-               ctx.resume().finally(resolve); return;
-             }
-           }
-           resolve();
-         });
+      if (p && typeof p.then === 'function') {
+        p.then(()=>{ soundEl.pause(); soundEl.currentTime = 0; audioUnlocked = true; enableStatus.textContent = 'Sound enabled'; resolve(); })
+         .catch(()=>{ audioUnlocked = true; enableStatus.textContent = 'Sound enabled (partial)'; resolve(); });
         return;
       }
-    } catch(e){}
-    if (window.AudioContext || window.webkitAudioContext) {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (ctx.state === "suspended") {
-        ctx.resume().finally(resolve); return;
-      }
+    } catch(e){
+      // continue to fallback
     }
+    audioUnlocked = true;
+    enableStatus.textContent = 'Sound enabled';
     resolve();
   });
 }
 
-window.addEventListener("click", ensureAudioUnlocked, { once:true });
-window.addEventListener("touchstart", ensureAudioUnlocked, { once:true });
+enableBtn.addEventListener('click', () => {
+  ensureAudioUnlocked();
+});
 
-function playLoopFor5s(){
-  ensureAudioUnlocked().then(()=>{
-    soundEl.currentTime = 0;
-    soundEl.loop = true;
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") p.catch(e=>console.error("Play error:", e));
-    setTimeout(stopSound, 5000);
-  }).catch(()=>{});
+/* Sound helpers */
+function playSound(loop=true){
+  return ensureAudioUnlocked().then(()=>{
+    try{
+      soundEl.loop = loop;
+      soundEl.currentTime = 0;
+      const p = soundEl.play();
+      if (p && typeof p.then === 'function') {
+        p.catch(err => {
+          console.error('play() error:', err);
+          enableStatus.textContent = 'Tap page to enable sound';
+        });
+      }
+    }catch(e){
+      console.error(e);
+    }
+  });
 }
 
-function playSound(loop=true){
-  ensureAudioUnlocked().then(()=>{
-    soundEl.loop = loop;
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") p.catch(e=>console.error("Play error:", e));
-  }).catch(()=>{});
+function playLoopFor5s(){
+  return ensureAudioUnlocked().then(()=>{
+    try{
+      soundEl.loop = true;
+      soundEl.currentTime = 0;
+      const p = soundEl.play();
+      if (p && typeof p.then === 'function') {
+        p.catch(err => console.error('play error', err));
+      }
+      setTimeout(stopSound, 5000);
+    }catch(e){ console.error(e); }
+  });
 }
 
 function stopSound(){
-  try{ soundEl.pause(); soundEl.currentTime = 0; soundEl.loop = false; }catch(e){}
+  try{
+    soundEl.pause();
+    soundEl.currentTime = 0;
+    soundEl.loop = false;
+  }catch(e){}
 }
 
-function testSound(){
-  ensureAudioUnlocked().then(()=>{
-    stopSound();
-    soundEl.loop = false;
-    const p = soundEl.play();
-    if (p && typeof p.then === "function") p.catch(e=>console.error("Play error:", e));
-  }).catch(()=>{});
-}
+function testSound(){ playSound(false); }
 
 /* ---------------- ALARM ---------------- */
 let alarmTime = null;
 let alarmTriggered = false;
 
 function setAlarm(){
-  alarmTime = document.getElementById("alarmTime").value;
+  alarmTime = document.getElementById('alarmTime').value;
   alarmTriggered = false;
-  document.getElementById("alarmStatus").textContent =
-    alarmTime ? ("Alarm set for " + alarmTime) : "Please choose a time.";
+  document.getElementById('alarmStatus').textContent = alarmTime ? ('Alarm set for ' + alarmTime) : 'Please choose a time.';
 }
 
 function clearAlarm(){
   alarmTime = null;
   alarmTriggered = false;
-  document.getElementById("alarmStatus").textContent = "No alarm set";
+  document.getElementById('alarmStatus').textContent = 'No alarm set';
   stopSound();
 }
 
-// Play immediately when time matches (no alert)
-setInterval(function(){
-  if(!alarmTime || alarmTriggered) return;
+/* Use seconds check for accuracy; play immediately (no alert) */
+setInterval(() => {
+  if (!alarmTime || alarmTriggered) return;
   const now = new Date();
-  const current = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
-  if(current === alarmTime){
+  const current = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  if (current === alarmTime){
     alarmTriggered = true;
-    ensureAudioUnlocked().then(()=>{
-      try{
-        soundEl.currentTime = 0;
-        soundEl.loop = true;
-        const p = soundEl.play();
-        if (p && typeof p.then === "function") {
-          p.catch(err=>{
-            console.error("Play blocked:", err);
-            document.getElementById("alarmStatus").textContent = "Tap page to enable sound";
-          });
-        }
-      }catch(e){ console.error(e); }
-    });
+    playSound(true); // continuous until user stops
   }
-},1000);
+}, 1000);
 
 /* ---------------- TIMER ---------------- */
 let timerSeconds = 0;
 let timerInterval = null;
 
+function updateTimerDisplay(){
+  const minutes = Math.floor(timerSeconds / 60);
+  const seconds = timerSeconds % 60;
+  document.getElementById('timerDisplay').textContent =
+    String(minutes).padStart(2,'0') + ':' + String(seconds).padStart(2,'0');
+}
+
 function startTimer(){
-  if(timerInterval) return;
-  if(timerSeconds === 0){
-    const minutes = parseInt(document.getElementById("timerMinutes").value);
-    if(!minutes || minutes <= 0){
-      alert("Please enter minutes.");
-      return;
-    }
+  if (timerInterval) return;
+  if (timerSeconds === 0){
+    const minutes = parseInt(document.getElementById('timerMinutes').value, 10);
+    if (!minutes || minutes <= 0){ alert('Please enter minutes.'); return; }
     timerSeconds = minutes * 60;
   }
   updateTimerDisplay();
-  timerInterval = setInterval(function(){
+  timerInterval = setInterval(() => {
     timerSeconds--;
-    if (timerSeconds <= 0) {
+    if (timerSeconds <= 0){
       timerSeconds = 0;
       updateTimerDisplay();
       clearInterval(timerInterval);
@@ -261,7 +259,7 @@ function startTimer(){
       return;
     }
     updateTimerDisplay();
-  },1000);
+  }, 1000);
 }
 
 function pauseTimer(){
@@ -273,27 +271,28 @@ function resetTimer(){
   clearInterval(timerInterval);
   timerInterval = null;
   timerSeconds = 0;
-  document.getElementById("timerDisplay").textContent = "00:00";
+  updateTimerDisplay();
   stopSound();
-}
-
-function updateTimerDisplay(){
-  const minutes = Math.floor(timerSeconds / 60);
-  const seconds = timerSeconds % 60;
-  document.getElementById("timerDisplay").textContent =
-    String(minutes).padStart(2,"0") + ":" + String(seconds).padStart(2,"0");
 }
 
 /* ---------------- STOPWATCH ---------------- */
 let stopwatchTime = 0; // centiseconds
 let stopwatchInterval = null;
 
+function updateStopwatch(){
+  const minutes = Math.floor(stopwatchTime / 6000);
+  const seconds = Math.floor((stopwatchTime % 6000) / 100);
+  const centis = stopwatchTime % 100;
+  document.getElementById('stopwatchDisplay').textContent =
+    String(minutes).padStart(2,'0') + ':' + String(seconds).padStart(2,'0') + ':' + String(centis).padStart(2,'0');
+}
+
 function startStopwatch(){
-  if(stopwatchInterval) return;
-  stopwatchInterval = setInterval(function(){
+  if (stopwatchInterval) return;
+  stopwatchInterval = setInterval(() => {
     stopwatchTime++;
     updateStopwatch();
-  },10);
+  }, 10);
 }
 
 function stopStopwatch(){
@@ -308,32 +307,19 @@ function resetStopwatch(){
   updateStopwatch();
 }
 
-function updateStopwatch(){
-  let minutes = Math.floor(stopwatchTime / 6000);
-  let seconds = Math.floor((stopwatchTime % 6000) / 100);
-  let centiseconds = stopwatchTime % 100;
-  document.getElementById("stopwatchDisplay").textContent =
-    String(minutes).padStart(2,"0") + ":" +
-    String(seconds).padStart(2,"0") + ":" +
-    String(centiseconds).padStart(2,"0");
-}
-
 /* ---------------- WORLD CLOCK ---------------- */
 function updateClock(selectId, outputId){
   const zone = document.getElementById(selectId).value;
-  if(zone === ""){
-    document.getElementById(outputId).textContent = "--:--:--";
-    return;
-  }
-  const time = new Date().toLocaleTimeString("en-GB",{ timeZone: zone });
+  if (!zone){ document.getElementById(outputId).textContent = '--:--:--'; return; }
+  const time = new Date().toLocaleTimeString('en-GB', { timeZone: zone });
   document.getElementById(outputId).textContent = time;
 }
 function updateWorldClocks(){
-  updateClock("country1","clock1");
-  updateClock("country2","clock2");
-  updateClock("country3","clock3");
+  updateClock('country1','clock1');
+  updateClock('country2','clock2');
+  updateClock('country3','clock3');
 }
-setInterval(updateWorldClocks,1000);
+setInterval(updateWorldClocks, 1000);
 updateWorldClocks();
 updateStopwatch();
 </script>
