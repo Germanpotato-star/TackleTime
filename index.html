@@ -110,7 +110,7 @@ button{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:
 
 <button class="mode-button" onclick="changeMode()">⇄</button>
 
-<!-- Use alarm1.wav (place this file next to this HTML) -->
+<!-- Place alarm1.wav next to this HTML file -->
 <audio id="alarmSound" src="alarm1.wav" preload="auto"></audio>
 
 <script>
@@ -132,74 +132,63 @@ const soundEl = document.getElementById('alarmSound');
 const enableBtn = document.getElementById('enableSoundBtn');
 const enableStatus = document.getElementById('enableStatus');
 let audioUnlocked = false;
+let autoStopTimeoutId = null;
 
 function ensureAudioUnlocked(){
   if (audioUnlocked) return Promise.resolve();
-  // try quick play/pause
   return new Promise((resolve) => {
     try {
       soundEl.currentTime = 0;
       const p = soundEl.play();
       if (p && typeof p.then === 'function') {
         p.then(()=>{ soundEl.pause(); soundEl.currentTime = 0; audioUnlocked = true; enableStatus.textContent = 'Sound enabled'; resolve(); })
-         .catch(()=>{ audioUnlocked = true; enableStatus.textContent = 'Sound enabled (partial)'; resolve(); });
+         .catch(()=>{ audioUnlocked = true; enableStatus.textContent = 'Sound enabled'; resolve(); });
         return;
       }
-    } catch(e){
-      // continue to fallback
-    }
+    } catch(e){}
     audioUnlocked = true;
     enableStatus.textContent = 'Sound enabled';
     resolve();
   });
 }
 
-enableBtn.addEventListener('click', () => {
-  ensureAudioUnlocked();
-});
+enableBtn.addEventListener('click', () => { ensureAudioUnlocked(); });
 
 /* Sound helpers */
-function playSound(loop=true){
+function startPlaying(loop=true, autoStopMs=0){
   return ensureAudioUnlocked().then(()=>{
     try{
+      // clear previous auto-stop if any
+      if (autoStopTimeoutId) { clearTimeout(autoStopTimeoutId); autoStopTimeoutId = null; }
       soundEl.loop = loop;
       soundEl.currentTime = 0;
       const p = soundEl.play();
       if (p && typeof p.then === 'function') {
-        p.catch(err => {
-          console.error('play() error:', err);
-          enableStatus.textContent = 'Tap page to enable sound';
-        });
+        p.catch(err => console.error('play() error:', err));
       }
-    }catch(e){
-      console.error(e);
-    }
-  });
-}
-
-function playLoopFor5s(){
-  return ensureAudioUnlocked().then(()=>{
-    try{
-      soundEl.loop = true;
-      soundEl.currentTime = 0;
-      const p = soundEl.play();
-      if (p && typeof p.then === 'function') {
-        p.catch(err => console.error('play error', err));
+      if (autoStopMs > 0){
+        autoStopTimeoutId = setTimeout(() => {
+          stopSound();
+          autoStopTimeoutId = null;
+        }, autoStopMs);
       }
-      setTimeout(stopSound, 5000);
     }catch(e){ console.error(e); }
   });
 }
 
+function playSound(loop=true){ return startPlaying(loop, 0); } // continuous until stop
+function playSoundFor5s(){ return startPlaying(true, 5000); } // loop and stop after 5s
+
 function stopSound(){
   try{
+    if (autoStopTimeoutId){ clearTimeout(autoStopTimeoutId); autoStopTimeoutId = null; }
     soundEl.pause();
     soundEl.currentTime = 0;
     soundEl.loop = false;
-  }catch(e){}
+  }catch(e){ console.error(e); }
 }
 
-function testSound(){ playSound(false); }
+function testSound(){ playSoundFor5s(); }
 
 /* ---------------- ALARM ---------------- */
 let alarmTime = null;
@@ -218,14 +207,15 @@ function clearAlarm(){
   stopSound();
 }
 
-/* Use seconds check for accuracy; play immediately (no alert) */
+/* Alarm: now auto-stops after 5s */
 setInterval(() => {
   if (!alarmTime || alarmTriggered) return;
   const now = new Date();
   const current = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
   if (current === alarmTime){
     alarmTriggered = true;
-    playSound(true); // continuous until user stops
+    // Play for 5 seconds then stop
+    playSoundFor5s();
   }
 }, 1000);
 
@@ -255,7 +245,8 @@ function startTimer(){
       updateTimerDisplay();
       clearInterval(timerInterval);
       timerInterval = null;
-      playLoopFor5s();
+      // Play sound for 5 seconds
+      playSoundFor5s();
       return;
     }
     updateTimerDisplay();
@@ -314,11 +305,7 @@ function updateClock(selectId, outputId){
   const time = new Date().toLocaleTimeString('en-GB', { timeZone: zone });
   document.getElementById(outputId).textContent = time;
 }
-function updateWorldClocks(){
-  updateClock('country1','clock1');
-  updateClock('country2','clock2');
-  updateClock('country3','clock3');
-}
+function updateWorldClocks(){ updateClock('country1','clock1'); updateClock('country2','clock2'); updateClock('country3','clock3'); }
 setInterval(updateWorldClocks, 1000);
 updateWorldClocks();
 updateStopwatch();
